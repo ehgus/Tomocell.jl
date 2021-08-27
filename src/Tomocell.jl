@@ -5,8 +5,9 @@ using StaticArrays: SVector
 using Format: cfmt
 
 
-export TCFile
+export TCFile, TCFcell
 
 include("FileHandler.jl")
+include("utils.jl")
 
 end # module

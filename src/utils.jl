@@ -1,0 +1,1 @@
+_getAttr(key,h5io) = read(attributes(h5io)[key])[1]
