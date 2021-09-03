@@ -2,7 +2,7 @@
 @enum ImgType TwoD=2 ThreeD=3
 
 struct TCFile{N}
-    tcfname::String
+    tcfname::AbstractString
     imgtype::ImgType
     dtype::Type{<:AbstractFloat}
     # paramters
@@ -12,7 +12,7 @@ struct TCFile{N}
     dt::Float64
 end
 
-function TCFile(tcfname::String, imgtype::String, dtype::Type{<:AbstractFloat}=Float64)
+function TCFile(tcfname::AbstractString, imgtype::AbstractString, dtype::Type{<:AbstractFloat}=Float64)
     _imgtype = if (imgtype =="2D") 
         2
     elseif (imgtype =="3D")
@@ -57,7 +57,7 @@ function raw_getindex(tcfile::TCFile,key::Int)
 end
 
 struct TCFcell{N}
-    tcfname::String
+    tcfname::AbstractString
     resol::SVector{N,Float64}
     # (idx)th image data
     idx::UInt32
@@ -65,7 +65,7 @@ struct TCFcell{N}
     CM::SVector{N,Float64}
     drymass::Float64
     # optional data
-    Optprop::Dict{String,Any}
+    Optprop::Dict{AbstractString,Any}
 end
 
 function TCFcell(tcfile::TCFile{N},idx::Integer, CM::SVector{N,<:AbstractFloat},drymass::AbstractFloat,Optprop::Dict{String,Any}=Dict{String,Any}()) where {N}
@@ -75,7 +75,7 @@ function TCFcell(tcfile::TCFile{N},idx::Integer, CM::SVector{N,<:AbstractFloat},
     TCFcell{N}(tcfname,resol,UInt(idx),CM,drymass,Optprop)
 end
 
-function Base.read(fname::String, ::Type{TCFcell})
+function TCFcell(fname::AbstractString)
     h5open(fname) do io
         if "type" ∉ keys(io)
             throw(ArgumentError("The file does not contain 'type' attribute. Is it TCFcell file?"))
@@ -96,3 +96,27 @@ function Base.read(fname::String, ::Type{TCFcell})
         end
     end
 end
+
+
+"""
+return data
+"""
+function Base.getindex(tcfcell::TCFcell, key::AbstractString)
+    if key == "CM"
+        tcfcell.CM
+    elseif key == "drymass"
+        tcfcell.drymass
+    else
+        tcfcell.Optprop[key]
+    end
+end
+
+function Base.setindex(key::AbstractString, value)
+    if key == "CM" || key == "drymass"
+        throw(ArgumentError("Invalid key"))
+    else
+        tcfcell.Optprop[key] = value
+    end
+end
+
+
