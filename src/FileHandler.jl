@@ -1,122 +1,87 @@
 
 @enum ImgType TwoD=2 ThreeD=3
 
-struct TCFile{N}
+"""
+interface of TCF file
+"""
+struct TCFile{T <: AbstractFloat,N} <: AbstractVector{Array{T, N}}
     tcfname::AbstractString
     imgtype::ImgType
-    dtype::Type{<:AbstractFloat}
     # paramters
     len::Int64
-    shape::SVector{N,Int64}
-    resol::SVector{N,Float64}
+    size::SVector{N,Int64}
+    resolution::SVector{N,Float64}
     dt::Float64
 end
 
-function TCFile(tcfname::AbstractString, imgtype::AbstractString, dtype::Type{<:AbstractFloat}=Float64)
-    _imgtype = if (imgtype =="2D") 
-        2
-    elseif (imgtype =="3D")
-        3
-    else
-        throw(ArgumentError("imgtype must be '3D' or '2D'"))
-    end
-    h5open(tcfname) do io
-        if "Data" ∉ keys(io)
-            throw(ArgumentError("The file does not contain 'Data' group. Is it TCF file?"))
-        elseif imgtype ∉ keys(io["Data"])
-            throw(ArgumentError("The TCFile does not support the suggested image type"))
-        else
-            h5io = io["Data"][imgtype]
-            len = _getAttr("DataCount", h5io)
-            shape = SVector{_imgtype}([_getAttr("Size$(idx)", h5io) for idx in ("X","Y","Z")[1:_imgtype]])
-            resol = SVector{_imgtype}([_getAttr("Resolution$(idx)", h5io) for idx in ("X","Y","Z")[1:_imgtype]])
-            dt = (len == 1) ? 0.0 : _getAttr("TimeInterval", h5io)
-            TCFile{_imgtype}(tcfname,ImgType(_imgtype),dtype,len,shape,resol,dt)
-        end
-    end
-end
+Base.size(tcfile::TCFile) = (tcfile.len,)
+dataSize(tcfile::TCFile) = tcfile.shape
+dataDims(tcfile::TCFile) = length(dataSize(tcfile))
+dataLength(tcfile::TCFile) = prod(dataSize(tcfile))
 
-Base.length(tcfile::TCFile) = tcfile.len
-Base.ndims(tcfile::TCFile) = length(tcfile.shape)
-
-function Base.getindex(tcfile::TCFile, key::Int)
-    data = convert(Array{tcfile.dtype,ndims(tcfile)}, raw_getindex(tcfile,key))
-    data ./= 1e4
-    return data
-end
-
-function raw_getindex(tcfile::TCFile,key::Int)
-    if length(tcfile) > key > 0
+function Base.getindex(tcfile::TCFile, key::Integer)
+    if length(tcfile) < key || key <= 0
         throw(BoundsError())
     else
         h5open(tcfile.tcfname) do io
-            data = read(io["Data/$(Int(tcfile.imgtype))D/$(cfmt("%06d",key))"])
+            # h5 file use zero index
+            rawData = read(io["Data/$(Int(tcfile.imgtype))D/$(cfmt("%06d",key-1))"])
+            data = convert(eltype(tcfile), raw_getindex(tcfile,key))
+            data ./= 1e4
             return data
         end
     end
 end
 
+
+"""
+TCF cell
+"""
 struct TCFcell{N}
+    # attribute
     tcfname::AbstractString
-    resol::SVector{N,Float64}
-    # (idx)th image data
-    idx::UInt32
-    # medatory data
-    CM::SVector{N,Float64}
-    drymass::Float64
-    # optional data
-    Optprop::Dict{AbstractString,Any}
+    index::UInt16
+    # data
+    VolumeOrArea::Float64   # μm³ or μm²
+    drymass::Float64        # pg
+    CM::SVector{N,Float64}  # μm
+    CompactMask::Union{Nothing,@NamedTuple{mask::Array{Bool, N},offset::SVector{N, Int64}}}
+    optional::Union{Nothing, Dict{AbstractString,Any}}
 end
 
-function TCFcell(tcfile::TCFile{N},idx::Integer, CM::SVector{N,<:AbstractFloat},drymass::AbstractFloat,Optprop::Dict{String,Any}=Dict{String,Any}()) where {N}
+dataDims(tcfcell::TCFcell) = length(tcfcell.CM)
+
+function TCFcell(tcfile::TCFile,index::Integer,VolumeOrArea, drymass, CM, mask=nothing, optional=nothing)
     tcfname = tcfile.tcfname
-    resol = tcfile.resol
-    @assert idx > 0
-    TCFcell{N}(tcfname,resol,UInt(idx),CM,drymass,Optprop)
+    N = dataSize(tcfile)
+    @assert index > 0
+
+    TCFcell{N}(tcfname, UInt(index), VolumeOrArea, drymass, CM, mask, optional)
 end
 
-function TCFcell(fname::AbstractString)
-    h5open(fname) do io
-        if "type" ∉ keys(io)
-            throw(ArgumentError("The file does not contain 'type' attribute. Is it TCFcell file?"))
-        elseif _getAttr("type",io) == "TCFcell"
-            # get attributes
-            tcfname = _getAttr("tcfname", io)
-            resol = read(attributes(io)["resol"])
-            idx = _getAttr("idx", io)
-            N = length(resol)
-            # get data
-            optprop = Dict{String,Any}(key => _getAttr(key, io) for key in keys(io))
-            CM = pop!(optprop, "CM")
-            drymass = pop!(optprop, "drymass")
-            
-            TCFcell{N}(tcfname,resol,idx,CM,drymass,Optprop)
-        else
-            throw(ArgumentError("'type' attribute has value '$(_getAttr("type",io))'. Is it TCFcell file?"))
-        end
+
+mutable struct TCFcellGroup{N} <: AbstractVector{Vector{TCFcell{N}}}
+    # attribute
+    tcfile::TCFile
+    cellGroup::Vector{Vector{TCFcell{N}}}
+end
+
+function TCFcellGroup(tcfcell::TCFcell, tcfcells...)
+    tcfname = tcfcell.tcfname
+    N = dataDims(tcfcell)
+    # variable variation
+    for _tcfcell in tcfcells
+        @assert isa(_tcfcell, TCFcell)
+        @assert _tcfcell.name == tcfname
+        @assert dataDims(_tcfcell) == N
     end
-end
-
-
-"""
-return data
-"""
-function Base.getindex(tcfcell::TCFcell, key::AbstractString)
-    if key == "CM"
-        tcfcell.CM
-    elseif key == "drymass"
-        tcfcell.drymass
-    else
-        tcfcell.Optprop[key]
+    # sort cell as groups
+    tcfile = TCFile(tcfname, N)
+    len = length(tcfile)
+    cellGroup = Vector{}(Vector{TCFcell{N}}(undef, 0), len)
+    for _tcfcell in tcfcells
+        push!(cellGroup[_tcfcell.index], _tcfcell)
     end
+
+    TCFcellGroup{N}(tcfile, cellGroup)
 end
-
-function Base.setindex(key::AbstractString, value)
-    if key == "CM" || key == "drymass"
-        throw(ArgumentError("Invalid key"))
-    else
-        tcfcell.Optprop[key] = value
-    end
-end
-
-
