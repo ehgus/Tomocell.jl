@@ -16,7 +16,7 @@ end
 
 Base.size(tcfile::TCFile) = (tcfile.len,)
 dataSize(tcfile::TCFile) = tcfile.shape
-dataDims(tcfile::TCFile) = length(dataSize(tcfile))
+dataNdims(tcfile::TCFile) = length(dataSize(tcfile))
 dataLength(tcfile::TCFile) = prod(dataSize(tcfile))
 
 function Base.getindex(tcfile::TCFile, key::Integer)
@@ -49,7 +49,7 @@ struct TCFcell{N}
     optional::Union{Nothing, Dict{AbstractString,Any}}
 end
 
-dataDims(tcfcell::TCFcell) = length(tcfcell.CM)
+dataNdims(tcfcell::TCFcell) = length(tcfcell.CM)
 
 function TCFcell(tcfile::TCFile,index::Integer,VolumeOrArea, drymass, CM, mask=nothing, optional=nothing)
     tcfname = tcfile.tcfname
