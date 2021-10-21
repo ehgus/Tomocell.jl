@@ -1,6 +1,3 @@
-
-@enum ImgType TwoD=2 ThreeD=3
-
 """
 interface of TCF file
 """
@@ -35,7 +32,7 @@ end
 
 
 """
-TCF cell
+TCFcell
 """
 struct TCFcell{N}
     # attribute
@@ -59,7 +56,9 @@ function TCFcell(tcfile::TCFile,index::Integer,VolumeOrArea, drymass, CM, mask=n
     TCFcell{N}(tcfname, UInt(index), VolumeOrArea, drymass, CM, mask, optional)
 end
 
-
+"""
+TCFcellGroup
+"""
 mutable struct TCFcellGroup{N} <: AbstractVector{Vector{TCFcell{N}}}
     # attribute
     tcfile::TCFile

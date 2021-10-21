@@ -8,8 +8,11 @@ using Images: otsu_threshold, opening, imfill, label_components
 
 export TCFile, TCFcell, TCFcellGroup, dataSize, dataDims, dataLength
 
-include("FileHandler.jl")
+#utils containing useful internal functions
 include("utils.jl")
+
+#structs and functions to be exposed
+include("FileHandler.jl")
 include("io.jl")
 
 end # module
