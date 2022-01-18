@@ -1,3 +1,6 @@
+# TCFile IO operation
+# R allowed
+
 
 function TCFile(tcfname::AbstractString, imgDim::Integer, dtype::Type{<:AbstractFloat}=Float64)
     if imgDim ∉ (2, 3)
@@ -22,6 +25,8 @@ function TCFile(tcfname::AbstractString, imgDim::Integer, dtype::Type{<:Abstract
     end
 end
 
+# TCFcell IO operation
+# RW allowed
 
 function TCFcell(io::HDF5.File)
     if !haskey(attributes(io), "type")

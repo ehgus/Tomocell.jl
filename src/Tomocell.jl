@@ -6,7 +6,7 @@ using Format: cfmt
 using Images: otsu_threshold, opening, imfill, label_components
 
 
-export TCFile, TCFcell, TCFcellGroup, dataSize, dataDims, dataLength
+export TCFile, TCFcell, TCFcellGroup, dataSize, dataNdims, dataLength
 
 #utils containing useful internal functions
 include("utils.jl")

@@ -12,7 +12,7 @@ struct TCFile{T <: AbstractFloat,N} <: AbstractVector{Array{T, N}}
 end
 
 Base.size(tcfile::TCFile) = (tcfile.len,)
-dataSize(tcfile::TCFile) = tcfile.shape
+dataSize(tcfile::TCFile) = tcfile.size
 dataNdims(tcfile::TCFile) = length(dataSize(tcfile))
 dataLength(tcfile::TCFile) = prod(dataSize(tcfile))
 
@@ -23,7 +23,7 @@ function Base.getindex(tcfile::TCFile, key::Integer)
         h5open(tcfile.tcfname) do io
             # h5 file use zero index
             rawData = read(io["Data/$(Int(tcfile.imgtype))D/$(cfmt("%06d",key-1))"])
-            data = convert(eltype(tcfile), raw_getindex(tcfile,key))
+            data = convert(eltype(tcfile), rawData)
             data ./= 1e4
             return data
         end
@@ -50,7 +50,7 @@ dataNdims(tcfcell::TCFcell) = length(tcfcell.CM)
 
 function TCFcell(tcfile::TCFile,index::Integer,VolumeOrArea, drymass, CM, mask=nothing, optional=nothing)
     tcfname = tcfile.tcfname
-    N = dataSize(tcfile)
+    N = dataNdims(tcfile)
     @assert index > 0
 
     TCFcell{N}(tcfname, UInt(index), VolumeOrArea, drymass, CM, mask, optional)
